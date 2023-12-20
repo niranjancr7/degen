@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "hardhat/console.sol";
+
+contract Token is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+    event OrnamentRedeemed(address indexed account, string ornamentName, uint256 num_tokens);
+
+    struct Ornament {
+        uint256 tokenCost;
+        uint256 num_tokens;
+    }
+
+    mapping(string => Ornament) public ornaments;
+    mapping(address => mapping(string => uint256)) public redeemedQuantities;
+    mapping(address => string) public redeemed;
+
+    constructor(
+        uint256 goldCoinPrice,
+        uint256 silverCoinPrice,
+        uint256 goldCoinQuantity,
+        uint256 silverCoinQuantity
+    ) ERC20("DEGEN", "DGN") Ownable(msg.sender) {
+        setOrnament("Gold Coin", goldCoinPrice, goldCoinQuantity);
+        setOrnament("Silver Coin", silverCoinPrice, silverCoinQuantity);
+    }
+
+    function setOrnament(string memory ornamentName, uint256 price, uint256 num_tokens) internal onlyOwner {
+        ornaments[ornamentName] = Ornament(price, num_tokens);
+    }
+
+    function mint(address account, uint256 num_tokens) external onlyOwner {
+        _mint(account, num_tokens);
+    }
+
+    function transferTokens(address recipient, uint256 num_tokens) external {
+        require(balanceOf(msg.sender) >= num_tokens, "INSUFFICIENT FUNDS!!");
+        _transfer(msg.sender, recipient, num_tokens);
+        emit Transfer(msg.sender, recipient, num_tokens);
+    }
+
+    function redeemOrnament(string memory ornamentName, uint256 num_tokens) external {
+        Ornament storage ornament = ornaments[ornamentName];
+        require(ornament.tokenCost > 0, "Ornament does not exist");
+        require(balanceOf(msg.sender) >= ornament.tokenCost * num_tokens, "INSUFFICIENT FUNDS!!");
+        require(ornament.num_tokens >= num_tokens, "Insufficient ornament quantity available");
+
+       
+        _burn(msg.sender, ornament.tokenCost * num_tokens);
+        redeemedQuantities[msg.sender][ornamentName] += num_tokens;
+        emit OrnamentRedeemed(msg.sender, ornamentName, num_tokens);
+    }
+
+    function burnTokens(uint256 num_tokens) external {
+        require(balanceOf(msg.sender) >= num_tokens, "INSUFFICIENT FUNDS!!");
+        _burn(msg.sender, num_tokens);
+        emit LogMessage("Burned tokens");
+    }
+}
